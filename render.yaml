@@ -3,6 +3,9 @@ services:
     name: sri-robot-audit-web
     env: python
     plan: free
-    buildCommand: "pip install -r requisitos.txt && python -m playwright install chromium"
-    startCommand: "streamlit run aplicacion.py --server.port $PORT --server.address 0.0.0.0"
+    buildCommand: |
+      pip install -r requirements.txt
+      python -m playwright install --with-deps chromium
+    startCommand: |
+      streamlit run aplicacion.py --server.port $PORT --server.address 0.0.0.0
     autoDeploy: true
