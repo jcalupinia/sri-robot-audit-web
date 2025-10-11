@@ -1,0 +1,6 @@
+streamlit
+playwright
+pandas
+lxml
+openpyxl
+python-dotenv
