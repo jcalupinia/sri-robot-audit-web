@@ -5,7 +5,9 @@ services:
     plan: free
     buildCommand: |
       pip install -r requirements.txt
-      python -m playwright install --with-deps chromium
+      python -m playwright install chromium
+      python -m playwright install-deps
     startCommand: |
+      export PLAYWRIGHT_BROWSERS_PATH=0
       streamlit run aplicacion.py --server.port $PORT --server.address 0.0.0.0
     autoDeploy: true
