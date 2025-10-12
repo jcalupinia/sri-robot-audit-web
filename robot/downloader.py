@@ -9,6 +9,7 @@ import os
 os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/opt/render/project/.playwright"
 os.environ["PYPPETEER_HOME"] = "/opt/render/project/.playwright"
 
+
 def descargar_sri(ruc: str, clave: str, anio: int, mes: int, tipo: str, formatos: list, destino: Path):
     """
     Automatiza la conexión al portal del SRI y descarga los comprobantes electrónicos.
@@ -26,8 +27,8 @@ def descargar_sri(ruc: str, clave: str, anio: int, mes: int, tipo: str, formatos
                 "--disable-setuid-sandbox",
                 "--disable-dev-shm-usage",
                 "--disable-gpu",
-                "--single-process"
-            ]
+                "--single-process",
+            ],
         )
         context = browser.new_context(accept_downloads=True)
         page = context.new_page()
@@ -47,4 +48,5 @@ def descargar_sri(ruc: str, clave: str, anio: int, mes: int, tipo: str, formatos
 
         browser.close()
 
+    # ✅ Devuelve el resultado para que Streamlit lo muestre
     return {"n_archivos": n_descargados}
