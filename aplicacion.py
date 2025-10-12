@@ -1,3 +1,9 @@
+import os
+
+# 👇 AGREGAR ESTAS DOS LÍNEAS ANTES DE TODO
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/tmp/ms-playwright"
+os.environ["PYPPETEER_HOME"] = "/tmp"
+
 import streamlit as st
 from pathlib import Path
 from robot.downloader import descargar_sri
