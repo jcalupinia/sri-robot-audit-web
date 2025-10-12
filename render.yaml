@@ -5,22 +5,18 @@ services:
     plan: free
 
     buildCommand: |
-      # Instala todas las dependencias del proyecto
+      # Instala dependencias y Playwright CLI
       pip install --upgrade pip
       pip install -r requirements.txt
+      playwright install chromium --with-deps
 
-      # Crea carpeta persistente para Playwright
+      # Crea carpeta persistente para navegadores
       mkdir -p /opt/render/project/.playwright
-
-      # Instala Chromium y dependencias dentro de esa carpeta
-      PLAYWRIGHT_BROWSERS_PATH=/opt/render/project/.playwright python -m playwright install --with-deps chromium
+      cp -r /root/.cache/ms-playwright/* /opt/render/project/.playwright/ || true
 
     startCommand: |
-      # Establece variables antes de iniciar Streamlit
       export PLAYWRIGHT_BROWSERS_PATH=/opt/render/project/.playwright
       export PYPPETEER_HOME=/opt/render/project/.playwright
-
-      # Inicia la app web
       streamlit run aplicacion.py --server.port $PORT --server.address 0.0.0.0
 
     autoDeploy: true
