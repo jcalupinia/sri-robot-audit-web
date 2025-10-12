@@ -7,18 +7,18 @@ import shutil
 from datetime import datetime
 
 # ==============================
-# CONFIGURACIÓN GENERAL
+# CONFIGURACIÓN GENERAL (Docker)
 # ==============================
 st.set_page_config(
     page_title="SRI Robot Audit",
     page_icon="🤖",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
-# ✅ Cambio clave: usar carpeta persistente en Render
-os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/opt/render/project/.playwright"
-os.environ["PYPPETEER_HOME"] = "/opt/render/project/.playwright"
+# ✅ RUTAS CORRECTAS PARA DOCKER
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/root/.cache/ms-playwright"
+os.environ["PYPPETEER_HOME"] = "/root/.cache/ms-playwright"
 
 BASE_DIR = Path(__file__).parent
 DESC_DIR = BASE_DIR / "descargas"
@@ -42,7 +42,6 @@ with st.sidebar:
 # ==============================
 st.title("🧾 SRI Robot Audit — Descarga y Reporte Automático")
 
-# Tabs (pestañas visuales)
 tab1, tab2 = st.tabs(["📥 Descarga de Comprobantes", "📊 Reportes y Resultados"])
 
 with tab1:
