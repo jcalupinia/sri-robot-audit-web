@@ -5,19 +5,32 @@ services:
     plan: free
 
     buildCommand: |
-      # Instala dependencias y Playwright
+      # 1️⃣ Instalar dependencias base
       pip install --upgrade pip
       pip install -r requirements.txt
+
+      # 2️⃣ Instalar navegadores y dependencias del sistema
       python -m playwright install-deps
       python -m playwright install chromium
 
-      # Copia navegadores a una carpeta persistente dentro del proyecto
+      # 3️⃣ Confirmar instalación y mostrar ruta real
+      echo "==== LISTADO DE NAVEGADORES DESCARGADOS ===="
+      find /root/.cache/ms-playwright -type f -name "headless_shell" || true
+
+      # 4️⃣ Copiar navegadores a ruta persistente dentro del proyecto
       mkdir -p /opt/render/project/src/.playwright
       cp -r /root/.cache/ms-playwright/* /opt/render/project/src/.playwright/ || true
 
+      # 5️⃣ Mostrar contenido final (verificación)
+      echo "==== ARCHIVOS EN RUTA FINAL ===="
+      find /opt/render/project/src/.playwright -type f -name "headless_shell" || true
+
     startCommand: |
+      # 6️⃣ Establecer variables de entorno
       export PLAYWRIGHT_BROWSERS_PATH=/opt/render/project/src/.playwright
       export PYPPETEER_HOME=/opt/render/project/src/.playwright
+
+      # 7️⃣ Lanzar la aplicación
       streamlit run aplicacion.py --server.port $PORT --server.address 0.0.0.0
 
     autoDeploy: true
