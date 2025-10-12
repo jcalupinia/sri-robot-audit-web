@@ -3,11 +3,12 @@ from pathlib import Path
 import time
 import os
 
-# ==============================
-# CONFIGURACIÓN PLAYWRIGHT (Render persistente)
-# ==============================
-os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/opt/render/project/.playwright"
-os.environ["PYPPETEER_HOME"] = "/opt/render/project/.playwright"
+# ==================================================
+# CONFIGURACIÓN PARA DOCKER (Chromium dentro del contenedor)
+# ==================================================
+# Estas rutas coinciden con las del Dockerfile
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/root/.cache/ms-playwright"
+os.environ["PYPPETEER_HOME"] = "/root/.cache/ms-playwright"
 
 
 def descargar_sri(ruc: str, clave: str, anio: int, mes: int, tipo: str, formatos: list, destino: Path):
@@ -19,7 +20,7 @@ def descargar_sri(ruc: str, clave: str, anio: int, mes: int, tipo: str, formatos
     n_descargados = 0
 
     with sync_playwright() as p:
-        # ✅ Render requiere navegador en modo headless y sin sandbox
+        # ✅ En Docker debe ser headless + sin sandbox
         browser = p.chromium.launch(
             headless=True,
             args=[
@@ -27,9 +28,10 @@ def descargar_sri(ruc: str, clave: str, anio: int, mes: int, tipo: str, formatos
                 "--disable-setuid-sandbox",
                 "--disable-dev-shm-usage",
                 "--disable-gpu",
-                "--single-process",
-            ],
+                "--single-process"
+            ]
         )
+
         context = browser.new_context(accept_downloads=True)
         page = context.new_page()
 
@@ -44,9 +46,9 @@ def descargar_sri(ruc: str, clave: str, anio: int, mes: int, tipo: str, formatos
         # - Selección tipo/año/mes
         # - Descarga XML y/o PDF
         # (Actualmente simulado con un contador de prueba)
-        n_descargados = 3  # Reemplaza con contador real
+        n_descargados = 3  # Reemplazar con lógica real de descarga
 
         browser.close()
 
-    # ✅ Devuelve el resultado para que Streamlit lo muestre
+    # Devuelve un resumen del proceso
     return {"n_archivos": n_descargados}
