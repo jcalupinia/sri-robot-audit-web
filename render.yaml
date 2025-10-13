@@ -5,32 +5,30 @@ services:
     plan: free
 
     buildCommand: |
-      # 1️⃣ Instalar dependencias base
+      echo "==== 🧱 INICIANDO BUILD SRI ROBOT AUDIT ===="
       pip install --upgrade pip
       pip install -r requirements.txt
 
-      # 2️⃣ Instalar navegadores y dependencias del sistema
+      # 1️⃣ Instalar dependencias del sistema para Playwright
       python -m playwright install-deps
-      python -m playwright install chromium
 
-      # 3️⃣ Confirmar instalación y mostrar ruta real
-      echo "==== LISTADO DE NAVEGADORES DESCARGADOS ===="
+      # 2️⃣ Instalar navegadores directamente en la ruta esperada
+      mkdir -p /root/.cache/ms-playwright
+      PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright python -m playwright install chromium
+
+      # 3️⃣ Verificar instalación exitosa
+      echo "==== ✅ NAVEGADORES DISPONIBLES ===="
       find /root/.cache/ms-playwright -type f -name "headless_shell" || true
 
-      # 4️⃣ Copiar navegadores a ruta persistente dentro del proyecto
-      mkdir -p /opt/render/project/src/.playwright
-      cp -r /root/.cache/ms-playwright/* /opt/render/project/src/.playwright/ || true
-
-      # 5️⃣ Mostrar contenido final (verificación)
-      echo "==== ARCHIVOS EN RUTA FINAL ===="
-      find /opt/render/project/src/.playwright -type f -name "headless_shell" || true
-
     startCommand: |
-      # 6️⃣ Establecer variables de entorno
-      export PLAYWRIGHT_BROWSERS_PATH=/opt/render/project/src/.playwright
-      export PYPPETEER_HOME=/opt/render/project/src/.playwright
+      # 4️⃣ Variables de entorno requeridas
+      export PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
+      export PYPPETEER_HOME=/root/.cache/ms-playwright
+      export STREAMLIT_SERVER_PORT=$PORT
+      export STREAMLIT_SERVER_HEADLESS=true
+      export STREAMLIT_SERVER_ADDRESS=0.0.0.0
 
-      # 7️⃣ Lanzar la aplicación
+      echo "==== 🚀 INICIANDO APLICACIÓN SRI ROBOT AUDIT ===="
       streamlit run aplicacion.py --server.port $PORT --server.address 0.0.0.0
 
     autoDeploy: true
