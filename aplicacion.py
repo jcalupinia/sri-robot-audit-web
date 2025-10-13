@@ -16,7 +16,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ✅ RUTAS CORRECTAS PARA DOCKER
+# ✅ RUTAS CORRECTAS PARA DOCKER/RENDER
 os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/root/.cache/ms-playwright"
 os.environ["PYPPETEER_HOME"] = "/root/.cache/ms-playwright"
 
@@ -59,8 +59,17 @@ with tab1:
             "Mes (1–12)", min_value=1, max_value=12, value=datetime.now().month
         )
     with col3:
-        tipo = st.selectbox("Tipo de comprobante", ["Facturas", "Retenciones", "Notas de crédito"])
-        formatos = st.multiselect("Formatos", ["XML", "PDF"], default=["XML"])
+        tipo = st.selectbox(
+            "Tipo de comprobante",
+            ["Facturas", "Retenciones", "Notas de crédito", "Notas de débito", "Liquidación de compra"],
+        )
+
+    # Nuevo: selección de origen y formatos
+    col4, col5 = st.columns([2, 2])
+    with col4:
+        origen = st.selectbox("Origen de comprobantes", ["Recibidos", "Emitidos"], index=0)
+    with col5:
+        formatos = st.multiselect("Formatos a descargar", ["XML", "PDF"], default=["XML", "PDF"])
 
     st.markdown("---")
 
@@ -71,37 +80,56 @@ with tab1:
             destino = DESC_DIR / ruc / f"{anio:04d}" / f"{mes:02d}"
             destino.mkdir(parents=True, exist_ok=True)
 
-            with st.spinner("🔍 Conectando con el SRI y descargando comprobantes..."):
-                resultado = descargar_sri(ruc, clave, anio, mes, tipo, formatos, destino)
+            with st.spinner(f"🔍 Conectando al SRI ({origen}) y descargando comprobantes..."):
+                resultado = descargar_sri(ruc, clave, anio, mes, tipo, formatos, destino, origen=origen)
 
-            st.success(f"✅ Descarga completada: {resultado['n_archivos']} archivos encontrados.")
+            if resultado["estado"] == "sin_descargas":
+                st.warning("⚠️ No se encontraron comprobantes para el período seleccionado.")
+            else:
+                st.success(
+                    f"✅ Descarga completada ({origen}). "
+                    f"XML: {resultado['n_xml']} | PDF: {resultado['n_pdf']}"
+                )
 
-            # ==============================
-            # GENERAR REPORTE EXCEL
-            # ==============================
-            if "XML" in formatos and resultado["n_archivos"] > 0:
-                excel_path = destino / f"reporte_{anio}_{mes:02d}.xlsx"
-                construir_reporte(destino, excel_path)
-                with open(excel_path, "rb") as f:
+                # ==============================
+                # TXT SEMILLA
+                # ==============================
+                if "txt" in resultado and Path(resultado["txt"]).exists():
+                    with open(resultado["txt"], "rb") as f:
+                        st.download_button(
+                            "⬇️ Descargar TXT semilla",
+                            f,
+                            file_name=Path(resultado["txt"]).name,
+                            use_container_width=True,
+                        )
+
+                # ==============================
+                # GENERAR REPORTE EXCEL
+                # ==============================
+                if resultado["n_xml"] > 0:
+                    xml_folder = destino / "XML"
+                    excel_path = destino / f"reporte_{anio}_{mes:02d}.xlsx"
+                    construir_reporte(xml_folder, excel_path)
+                    with open(excel_path, "rb") as f:
+                        st.download_button(
+                            "📊 Descargar reporte Excel",
+                            f,
+                            file_name=excel_path.name,
+                            use_container_width=True,
+                        )
+
+                # ==============================
+                # DESCARGAR ZIP COMPLETO
+                # ==============================
+                zip_path = destino.with_suffix(".zip")
+                shutil.make_archive(str(destino), "zip", destino)
+                with open(zip_path, "rb") as f:
                     st.download_button(
-                        "⬇️ Descargar reporte Excel",
+                        "📦 Descargar ZIP de comprobantes",
                         f,
-                        file_name=excel_path.name,
+                        file_name=zip_path.name,
                         use_container_width=True,
                     )
-
-            # ==============================
-            # DESCARGAR ZIP
-            # ==============================
-            zip_path = destino.with_suffix(".zip")
-            shutil.make_archive(str(destino), "zip", destino)
-            with open(zip_path, "rb") as f:
-                st.download_button(
-                    "📦 Descargar ZIP de comprobantes",
-                    f,
-                    file_name=zip_path.name,
-                    use_container_width=True,
-                )
 
 with tab2:
     st.markdown("#### 📈 Próximamente: dashboard de auditoría visual")
