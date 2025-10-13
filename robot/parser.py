@@ -6,11 +6,9 @@ from openpyxl import load_workbook
 from openpyxl.chart import BarChart, Reference
 from openpyxl.chart.shapes import GraphicalProperties
 from openpyxl.drawing.colors import ColorChoice
-from openpyxl.drawing.fill import PatternFillProperties
-
 
 # ============================================================
-# LECTURA Y PARSEO DE XMLS SRI
+# LECTURA Y PARSEO DE XMLS SRI (robusto y compatible)
 # ============================================================
 
 def _leer_xml(xml_path: Path) -> dict:
@@ -22,24 +20,39 @@ def _leer_xml(xml_path: Path) -> dict:
     try:
         root = ET.parse(xml_path).getroot()
 
-        d["fecha"] = root.findtext(".//fechaEmision", default="").strip()
-        d["rucEmisor"] = root.findtext(".//ruc", default="").strip()
-        d["razonSocial"] = root.findtext(".//razonSocial", default="").strip()
+        # Detectar namespace dinámico (puede variar entre comprobantes)
+        ns = {"ns": root.tag.split("}")[0].strip("{")} if "}" in root.tag else {}
+
+        # Campos generales
+        d["fechaEmision"] = root.findtext(".//ns:fechaEmision", default="", namespaces=ns)
+        d["rucEmisor"] = root.findtext(".//ns:ruc", default="", namespaces=ns)
+        d["razonSocial"] = root.findtext(".//ns:razonSocial", default="", namespaces=ns)
+        d["rucReceptor"] = root.findtext(".//ns:identificacionComprador", default="", namespaces=ns)
+        d["razonSocialReceptor"] = root.findtext(".//ns:razonSocialComprador", default="", namespaces=ns)
+        d["claveAcceso"] = root.findtext(".//ns:claveAcceso", default="", namespaces=ns)
+        d["tipoDocumento"] = root.findtext(".//ns:codDoc", default="", namespaces=ns)
 
         def _num(val):
             try:
-                return float(val) if val else 0.0
-            except ValueError:
+                return float(val.replace(",", "").strip()) if val else 0.0
+            except Exception:
                 return 0.0
 
-        d["subtotal"] = _num(root.findtext(".//totalSinImpuestos", default="0"))
-        d["iva"] = _num(root.findtext(".//iva", default="0"))
-        d["total"] = _num(root.findtext(".//importeTotal", default="0"))
+        # Valores económicos
+        d["subtotal"] = _num(root.findtext(".//ns:totalSinImpuestos", default="0", namespaces=ns))
+        d["total"] = _num(root.findtext(".//ns:importeTotal", default="0", namespaces=ns))
+        d["iva"] = 0.0
+
+        # Detectar IVA (código 2)
+        for imp in root.findall(".//ns:totalImpuesto", namespaces=ns):
+            codigo = imp.findtext("ns:codigo", default="", namespaces=ns)
+            valor = imp.findtext("ns:valor", default="0", namespaces=ns)
+            if codigo == "2":
+                d["iva"] += _num(valor)
 
     except Exception as e:
         d["error"] = f"Error leyendo {xml_path.name}: {e}"
     return d
-
 
 # ============================================================
 # CONSTRUCCIÓN DEL REPORTE EN EXCEL
@@ -47,8 +60,11 @@ def _leer_xml(xml_path: Path) -> dict:
 
 def construir_reporte(carpeta_mes: Path, excel_salida: Path):
     """
-    Genera un Excel con detalle, totales por emisor y errores (si los hay),
-    incluyendo gráfico de barras con estilo corporativo SRI.
+    Genera un Excel con:
+    - Detalle de comprobantes
+    - Totales por emisor
+    - Errores detectados
+    Incluye gráfico de barras con estilo corporativo SRI.
     """
     rows = []
     for xml in carpeta_mes.rglob("*.xml"):
@@ -59,14 +75,16 @@ def construir_reporte(carpeta_mes: Path, excel_salida: Path):
         return
 
     df = pd.DataFrame(rows)
-    errores = df[df["error"].notna()] if "error" in df.columns else pd.DataFrame()
+    errores = df[df.get("error").notna()] if "error" in df.columns else pd.DataFrame()
 
+    # Agrupar totales por emisor
     piv = (
         df.groupby(["rucEmisor", "razonSocial"], dropna=False)[["subtotal", "iva", "total"]]
         .sum()
         .reset_index()
     )
 
+    # Exportar a Excel con varias hojas
     with pd.ExcelWriter(excel_salida, engine="openpyxl") as xls:
         df.to_excel(xls, index=False, sheet_name="Detalle")
         piv.to_excel(xls, index=False, sheet_name="Totales por Emisor")
@@ -76,7 +94,6 @@ def construir_reporte(carpeta_mes: Path, excel_salida: Path):
     _ajustar_columnas_excel(excel_salida)
     _insertar_grafico_corporativo(excel_salida)
     print(f"✅ Reporte generado: {excel_salida.name}")
-
 
 # ============================================================
 # AJUSTE DE COLUMNAS
@@ -96,7 +113,6 @@ def _ajustar_columnas_excel(archivo_excel: Path):
                     pass
             ws.column_dimensions[column].width = max(10, min(max_length + 2, 50))
     wb.save(archivo_excel)
-
 
 # ============================================================
 # GRÁFICO CORPORATIVO SRI (azul y gris)
@@ -121,24 +137,20 @@ def _insertar_grafico_corporativo(archivo_excel: Path):
     chart.width = 20
 
     # Datos y categorías
-    data = Reference(ws, min_col=4, min_row=1, max_row=num_filas)  # columna "total"
-    cats = Reference(ws, min_col=2, min_row=2, max_row=num_filas)  # columna "razonSocial"
+    data = Reference(ws, min_col=4, min_row=1, max_row=num_filas)  # columna total
+    cats = Reference(ws, min_col=2, min_row=2, max_row=num_filas)  # razonSocial
     chart.add_data(data, titles_from_data=True)
     chart.set_categories(cats)
 
-    # 🎨 Estilo corporativo SRI
-    azul_sri = "1E4AA8"      # Azul institucional
-    gris_suave = "A0A0A0"    # Gris complementario
-    chart.graphicalProperties = GraphicalProperties(
-        ln=ColorChoice(prstClr=gris_suave)
-    )
+    # 🎨 Estilo corporativo
+    azul_sri = "1E4AA8"
+    gris_suave = "A0A0A0"
+    chart.graphicalProperties = GraphicalProperties(ln=ColorChoice(prstClr=gris_suave))
     chart.graphicalProperties.solidFill = azul_sri
 
-    # Mostrar valores encima de las barras
     from openpyxl.chart.label import DataLabelList
     chart.dataLabels = DataLabelList()
     chart.dataLabels.showVal = True
 
-    # Insertar gráfico en celda H2
     ws.add_chart(chart, "H2")
     wb.save(archivo_excel)
