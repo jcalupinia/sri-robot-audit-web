@@ -1,54 +1,21 @@
-# ============================================================
-#  SRI ROBOT AUDIT — Dependencias principales
-#  Versión: 1.0 | Fecha: 2025-10
-#  Compatible con Python 3.13 / Render / Docker
-# ============================================================
-
-# ------------------------------
-# 🌐 INTERFAZ WEB
-# ------------------------------
-streamlit==1.39.0           # Frontend web (UI)
-watchdog==4.0.2             # Recarga automática y monitoreo de archivos
-
-# ------------------------------
-# 🧠 AUTOMATIZACIÓN CON PLAYWRIGHT
-# ------------------------------
-playwright==1.47.0           # Control del navegador Chromium
-pyee==11.1.0                 # Manejador de eventos interno de Playwright
-
-# ------------------------------
-# 📊 PROCESAMIENTO DE DATOS
-# ------------------------------
-pandas==2.2.3                # Manipulación de datos tabulares
-numpy==2.1.1                 # Cálculos numéricos (base de pandas)
-openpyxl==3.1.5              # Escritura de Excel (gráficos y estilos)
-lxml==5.3.0                  # Procesamiento XML avanzado
-python-dateutil==2.9.0.post0 # Manejo de fechas y zonas horarias
-pytz==2024.2                 # Soporte adicional de zonas horarias
-
-# ------------------------------
-# ⚙️ UTILIDADES DEL SISTEMA
-# ------------------------------
-requests==2.32.3             # Llamadas HTTP (para futuras integraciones)
-python-dotenv==1.0.1         # Manejo de variables de entorno
-pathlib==1.0.1               # Compatibilidad extendida para rutas
-tqdm==4.66.5                 # Barra de progreso opcional (descargas largas)
-
-# ------------------------------
-# 🧰 REGISTRO Y DEPURACIÓN
-# ------------------------------
-rich==13.9.2                 # Logs con colores y formato amigable
-loguru==0.7.2                # Logging avanzado, rotación automática de logs
-
-# ------------------------------
-# 🧾 SEGURIDAD Y FORMATO
-# ------------------------------
-charset-normalizer==3.3.2    # Codificación segura de caracteres (TXT, XML)
-certifi==2024.8.30           # Certificados HTTPS actualizados
-idna==3.10                   # Soporte de dominios internacionales
-
-# ------------------------------
-# 🧩 FUTURO / OPCIONALES
-# ------------------------------
-beautifulsoup4==4.12.3       # Parsing HTML auxiliar (si el SRI cambia el DOM)
-html5lib==1.1                # Motor de respaldo para parsing HTML
+streamlit==1.38.0
+watchdog==4.0.1
+playwright==1.46.0
+pyee==11.1.0
+pandas==2.2.2
+numpy==1.26.4
+openpyxl==3.1.4
+lxml==5.2.2
+python-dateutil==2.9.0.post0
+pytz==2024.1
+requests==2.32.0
+python-dotenv==1.0.1
+pathlib==1.0.1
+tqdm==4.66.4
+rich==13.8.1
+loguru==0.7.2
+charset-normalizer==3.3.2
+certifi==2024.6.2
+idna==3.8
+beautifulsoup4==4.12.3
+html5lib==1.1
