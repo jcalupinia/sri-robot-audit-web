@@ -1,45 +1,31 @@
 # ============================================================
-# SRI ROBOT AUDIT — Dependencias estables (Render 2025)
+# SRI ROBOT AUDIT — Dependencias principales
+# Versión estable: Octubre 2025
+# Compatible con Python 3.11 / Render / Docker
 # ============================================================
 
-# ------------------------------
-# 🌐 INTERFAZ WEB
-# ------------------------------
-streamlit==1.38.0           # UI principal
-watchdog==4.0.1             # Auto recarga de archivos
+# -------------------------------
+# INTERFAZ WEB
+# -------------------------------
+streamlit==1.39.0           # UI principal
+watchdog==4.0.0             # Recarga automática (Streamlit + Docker)
 
-# ------------------------------
-# 🧠 AUTOMATIZACIÓN CON PLAYWRIGHT
-# ------------------------------
-playwright==1.45.1           # Control de navegador Chromium
-pyee==11.1.0                 # Manejador interno de eventos
+# -------------------------------
+# AUTOMATIZACIÓN CON PLAYWRIGHT
+# -------------------------------
+playwright==1.47.0           # Control de Chromium estable
+pyee==11.1.0                 # Manejador interno de eventos de Playwright
 
-# ------------------------------
-# 📊 PROCESAMIENTO DE DATOS
-# ------------------------------
-pandas==2.2.2
-numpy==1.26.4
-openpyxl==3.1.4
-lxml==5.2.2
-python-dateutil==2.9.0.post0
-pytz==2024.1
+# -------------------------------
+# PROCESAMIENTO DE DATOS
+# -------------------------------
+pandas==2.2.3                # Manipulación de datos tabulares
+numpy==1.26.4                # Cálculos numéricos
+openpyxl==3.1.5              # Escritura de Excel y gráficos
+lxml==5.3.0                  # Procesamiento XML avanzado
 
-# ------------------------------
-# ⚙️ UTILIDADES GENERALES
-# ------------------------------
-requests==2.31.0
-python-dotenv==1.0.1
-pathlib==1.0.1
-tqdm==4.66.4
-
-# ------------------------------
-# 🧾 REGISTRO Y DEPURACIÓN
-# ------------------------------
-rich==13.8.1
-loguru==0.7.2
-
-# ------------------------------
-# 🧩 EXTRAS OPCIONALES
-# ------------------------------
-beautifulsoup4==4.12.3
-html5lib==1.1
+# -------------------------------
+# UTILIDADES DEL SISTEMA
+# -------------------------------
+python-dotenv==1.0.1         # Variables de entorno locales
+tzdata==2024.2               # Zonas horarias (Render + pandas)
