@@ -1,5 +1,5 @@
 # ============================================================
-# DOCKERFILE: SRI Robot Audit — Playwright + Streamlit (Stable 2025)
+# DOCKERFILE: SRI Robot Audit — Playwright + Streamlit (Stable Render Fix)
 # ============================================================
 FROM python:3.11-slim
 
@@ -7,7 +7,7 @@ FROM python:3.11-slim
 # 1️⃣ Instalar dependencias del sistema (Chromium + compilación)
 # ==============================
 RUN apt-get update && apt-get install -y \
-    wget gnupg ca-certificates fonts-liberation \
+    wget gnupg ca-certificates fonts-liberation fonts-dejavu-core \
     build-essential gcc g++ make \
     libxml2-dev libxslt1-dev zlib1g-dev \
     libasound2 libatk1.0-0 libatk-bridge2.0-0 libatspi2.0-0 libcups2 \
@@ -26,7 +26,7 @@ COPY . /app
 # ==============================
 RUN pip install --upgrade pip setuptools wheel
 RUN pip install --use-deprecated=legacy-resolver -r requirements.txt
-RUN python -m playwright install --with-deps chromium
+RUN python -m playwright install chromium
 
 # ==============================
 # 4️⃣ Variables de entorno
