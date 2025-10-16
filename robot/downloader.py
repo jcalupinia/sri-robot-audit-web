@@ -2,182 +2,136 @@ from playwright.sync_api import sync_playwright
 from pathlib import Path
 from datetime import datetime
 import csv, re, json, os, time
+from robot.historial import registrar_descarga  # ✅ nuevo módulo
 
-# ====== Playwright en Docker/Render ======
+# ============================================================
+# CONFIGURACIÓN GLOBAL PARA DOCKER/RENDER
+# ============================================================
 os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/root/.cache/ms-playwright"
 os.environ["PYPPETEER_HOME"] = "/root/.cache/ms-playwright"
 
-URLS = {
-    "Recibidos": "https://srienlinea.sri.gob.ec/comprobantes-electronicos-internet/pages/consultas/recibidos/comprobantesRecibidos.jsf",
-    "Emitidos":  "https://srienlinea.sri.gob.ec/comprobantes-electronicos-internet/pages/consultas/emitidos/comprobantesEmitidos.jsf",
-}
+# URLs base
+RECIBIDOS_URL = "https://srienlinea.sri.gob.ec/comprobantes-electronicos-internet/pages/consultas/recibidos/comprobantesRecibidos.jsf"
+EMITIDOS_URL = "https://srienlinea.sri.gob.ec/comprobantes-electronicos-internet/pages/consultas/menu.jsf"
+BUSQUEDA_CLAVE_URL = RECIBIDOS_URL  # en la mayoría de casos es el mismo
 
-# Mapeo de tipos a etiquetas visibles (ajusta si tu pantalla usa otras).
 TIPOS_MAP = {
     "Facturas": "Factura",
     "Retenciones": "Comprobante de Retención",
     "Notas de crédito": "Notas de Crédito",
     "Notas de débito": "Notas de Débito",
     "Liquidación de compra": "Liquidación de compra de bienes y prestación de servicios",
+    "Factura": "Factura",
+    "Nota de Crédito": "Nota de Crédito",
+    "Nota de Débito": "Nota de Débito",
+    "Guía de Remisión": "Guía de Remisión",
+    "Comprobante de Retención": "Comprobante de Retención",
 }
 
-def _mes_a_texto(mes:int)->str:
-    return ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
-            "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][mes-1]
 
-def _es_clave(valor:str)->bool:
-    return bool(re.fullmatch(r"\d{49}", (valor or "").strip()))
+# ============================================================
+# FUNCIONES AUXILIARES
+# ============================================================
 
-def _detectar_delimitador(sample:str)->str:
-    # detecta ; , o tab
-    counts = { ';': sample.count(';'), ',': sample.count(','), '\t': sample.count('\t') }
-    return max(counts, key=counts.get) if any(counts.values()) else ';'
+def _mes_a_texto(mes: int) -> str:
+    return [
+        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ][mes - 1]
+
+
+def _es_clave(valor: str) -> bool:
+    return bool(re.fullmatch(r"\d{49}", valor or ""))
+
 
 def _extraer_claves_desde_txt(txt_path: Path):
     claves = []
-    sample = txt_path.read_text(encoding="utf-8", errors="ignore")[:4096]
-    sep = _detectar_delimitador(sample)
+    if not txt_path.exists():
+        return claves
+    with open(txt_path, "r", encoding="utf-8", errors="ignore") as f:
+        sample = f.read(4096)
+        sep = ";" if sample.count(";") >= sample.count(",") else ","
     with open(txt_path, "r", encoding="utf-8", errors="ignore") as f:
         reader = csv.reader(f, delimiter=sep)
         for row in reader:
-            if not row: 
+            if not row:
                 continue
-            # Buscar columna clave (49 dígitos)
-            clave = next((c.strip() for c in row if _es_clave(c)), None)
-            if not clave:
-                continue
-            # Extras útiles si vienen en el TXT:
-            tipo = next((c.strip() for c in row if c and c.strip().lower().startswith(("factura","comprobante de retención","notas de crédito","notas de débito","liquidación"))), "")
-            fecha = next((c.strip() for c in row if re.fullmatch(r"\d{2}/\d{2}/\d{4}", c.strip())), "")
-            claves.append({"clave": clave, "tipo": tipo, "fecha": fecha})
+            candidato = next((c.strip() for c in row if _es_clave(c.strip())), None)
+            if candidato:
+                tipo = next((c.strip() for c in row if "factura" in c.lower()), "Factura")
+                claves.append({"clave": candidato, "tipo": tipo})
     return claves
 
-def _click_texto(page, texto:str)->bool:
-    try:
-        page.get_by_role("button", name=texto, exact=False).click(timeout=3000); return True
-    except Exception:
-        pass
-    try:
-        page.get_by_text(texto, exact=False).click(timeout=3000); return True
-    except Exception:
-        pass
-    try:
-        page.locator(f"//button[contains(., '{texto}') or @title[contains(.,'{texto}')]]").first.click(timeout=3000); return True
-    except Exception:
-        return False
 
-def _seleccionar(page, etiqueta:str, valor_visible:str):
-    # Prioriza label → select; si no, busca por texto y sube al select más cercano
+def _click_descargar(page, texto_btn: str):
     try:
-        sel = page.get_by_label(etiqueta, exact=False).locator("select")
-        sel.select_option(label=valor_visible)
-        return
+        page.get_by_role("button", name=texto_btn, exact=False).click(timeout=4000)
+        return True
     except Exception:
-        pass
+        try:
+            page.get_by_text(texto_btn, exact=False).click(timeout=4000)
+            return True
+        except Exception:
+            return False
+
+
+def _seleccionar(page, etiqueta: str, valor_visible: str):
     try:
-        page.locator(f"text={etiqueta}").locator("xpath=..").locator("select").select_option(label=valor_visible)
-        return
+        page.select_option("select", label=valor_visible)
     except Exception:
-        pass
-    # Último recurso: algún select en pantalla con esa opción
-    try:
-        all_selects = page.locator("select")
-        count = all_selects.count()
-        for i in range(count):
-            try:
-                all_selects.nth(i).select_option(label=valor_visible)
-                return
-            except Exception:
-                continue
-    except Exception:
-        pass
+        try:
+            lab = page.get_by_label(etiqueta, exact=False)
+            sel = lab.locator("select")
+            sel.select_option(label=valor_visible)
+        except Exception:
+            pass
+
 
 def _espera_captcha(page):
     try:
-        loc = page.locator("img[alt='captcha']")
-        if loc.is_visible(timeout=1500):
+        if page.locator("img[alt='captcha']").is_visible(timeout=2000):
             page.wait_for_selector("img[alt='captcha']", state="detached", timeout=60000)
     except Exception:
         pass
 
-def _login_y_cookies(context, page, ruc, clave, cookies_path:Path):
-    # Cookies por RUC
+
+def _login_y_cookies(context, page, ruc, clave, cookies_path: Path):
     if cookies_path.exists():
         try:
             context.add_cookies(json.loads(cookies_path.read_text()))
             return
         except Exception:
             pass
-    # Login NAT
+
     page.goto("https://srienlinea.sri.gob.ec/sri-en-linea/inicio/NAT", timeout=60000)
     page.wait_for_load_state("domcontentloaded")
+
     try:
-        page.fill("input[name='usuario']", ruc)
-        page.fill("input[name='password']", clave)
-    except Exception:
-        page.get_by_placeholder("Ruc/Cédula/Pasaporte").fill(ruc)
-        page.get_by_placeholder("Contraseña").fill(clave)
+        page.fill("input[placeholder*='Ruc'], input[name*='usuario']", ruc)
+        page.fill("input[type='password'], input[name*='password']", clave)
+    except Exception as e:
+        print(f"[WARN] No se encontraron campos de login: {e}")
+
     _espera_captcha(page)
-    _click_texto(page, "Ingresar")
+    _click_descargar(page, "Ingresar")
     page.wait_for_load_state("networkidle")
-    # Guardar cookies
+
     try:
         cookies_path.write_text(json.dumps(context.cookies()))
     except Exception:
         pass
 
-def _buscar_por_clave(page, clave:str):
-    # Marca la opción "Clave de acceso / Nro. autorización" si existe
-    try:
-        page.get_by_label("Clave de acceso", exact=False).check(timeout=1500)
-    except Exception:
-        try:
-            page.get_by_text("Clave de acceso", exact=False).click(timeout=1500)
-        except Exception:
-            pass
-    # Completa la clave (input principal)
-    try:
-        page.fill("input", clave)
-    except Exception:
-        try:
-            page.get_by_placeholder("Clave de acceso").fill(clave)
-        except Exception:
-            pass
-    _click_texto(page, "Consultar")
-    page.wait_for_load_state("networkidle")
-    time.sleep(0.4)
 
-def _descargar_xml(page, destino:Path, nombre:str)->bool:
-    try:
-        with page.expect_download() as dlinfo:
-            # Variantes de botón/ícono
-            if not (_click_texto(page, "XML") or _click_texto(page, "Descargar XML")):
-                page.locator("a[title*='XML'], button[title*='XML']").first.click(timeout=2500)
-        d = dlinfo.value
-        d.save_as(str(destino / f"{nombre}.xml"))
-        return True
-    except Exception:
-        return False
+# ============================================================
+# FUNCIÓN PRINCIPAL
+# ============================================================
 
-def _descargar_pdf(page, destino:Path, nombre:str)->bool:
-    try:
-        with page.expect_download() as dlinfo:
-            if not (_click_texto(page, "RIDE") or _click_texto(page, "PDF") or _click_texto(page, "Descargar PDF")):
-                page.locator("a[title*='PDF'], a[title*='RIDE'], button[title*='PDF']").first.click(timeout=2500)
-        d = dlinfo.value
-        d.save_as(str(destino / f"{nombre}.pdf"))
-        return True
-    except Exception:
-        return False
-
-def descargar_sri(ruc: str, clave: str, anio: int, mes: int, tipo: str, formatos: list, destino: Path, origen:str="Recibidos"):
-    """
-    Flujo: (Recibidos/Emitidos) -> TXT semilla -> descargar XML (+PDF si aplica).
-    Retorna dict con contadores y ruta del TXT.
-    """
+def descargar_sri(ruc: str, clave: str, anio: int, mes: int, tipo: str, formatos: list, destino: Path, origen: str = "Recibidos"):
     destino.mkdir(parents=True, exist_ok=True)
-    destino_xml = destino / "XML"; destino_pdf = destino / "PDF"
-    destino_xml.mkdir(exist_ok=True); destino_pdf.mkdir(exist_ok=True)
+    destino_xml = destino / "XML"
+    destino_pdf = destino / "PDF"
+    destino_xml.mkdir(exist_ok=True)
+    destino_pdf.mkdir(exist_ok=True)
 
     n_xml = n_pdf = 0
     cookies_path = Path(f"cookies_{ruc}.json")
@@ -185,92 +139,94 @@ def descargar_sri(ruc: str, clave: str, anio: int, mes: int, tipo: str, formatos
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=True,
-            args=["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu","--single-process"]
+            args=[
+                "--no-sandbox", "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage", "--disable-gpu",
+                "--single-process"
+            ]
         )
         context = browser.new_context(accept_downloads=True)
         page = context.new_page()
 
-        # 1) Login/cookies
         _login_y_cookies(context, page, ruc, clave, cookies_path)
 
-        # 2) Ir al módulo según Origen
-        url_modulo = URLS.get(origen, URLS["Recibidos"])
-        page.goto(url_modulo, timeout=60000)
+        # Seleccionar módulo según tipo
+        if origen.lower().startswith("emit"):
+            page.goto(EMITIDOS_URL, timeout=60000)
+        else:
+            page.goto(RECIBIDOS_URL, timeout=60000)
+
         page.wait_for_load_state("domcontentloaded")
         _espera_captcha(page)
 
-        # 3) Filtros (Año, Mes, Tipo)
+        # Aplicar filtros
         try:
-            _seleccionar(page, "Período emisión", str(anio))                 # Año
-            _seleccionar(page, "Período emisión", _mes_a_texto(mes))         # Mes
-            # Un tercer combo puede ser 'Todos' (día):
-            try: _seleccionar(page, "Período emisión", "Todos")
-            except Exception: pass
-
+            _seleccionar(page, "Período emisión", str(anio))
+            _seleccionar(page, "Período emisión", _mes_a_texto(mes))
             tipo_visible = TIPOS_MAP.get(tipo, tipo)
             _seleccionar(page, "Tipo de comprobante", tipo_visible)
         except Exception as e:
-            print(f"[WARN] Filtros no aplicados automáticamente: {e}")
+            print(f"[WARN] No se pudieron aplicar filtros: {e}")
 
-        # 4) Consultar
-        _click_texto(page, "Consultar")
+        _click_descargar(page, "Consultar")
         page.wait_for_load_state("networkidle")
-        time.sleep(0.8)
+        time.sleep(2)
 
-        # 5) Descargar TXT (Descargar reporte)
-        with page.expect_download() as dl_info:
-            ok = _click_texto(page, "Descargar reporte")
-            if not ok:
-                raise RuntimeError("No se encontró el botón 'Descargar reporte'.")
-        dl = dl_info.value
-        sugerido = dl.suggested_filename or f"{origen}_{anio}_{mes:02d}.txt"
-        txt_path = destino / sugerido
-        dl.save_as(str(txt_path))
-        print(f"[OK] TXT guardado en {txt_path}")
+        # Descargar TXT
+        try:
+            with page.expect_download() as dl_info:
+                _click_descargar(page, "Descargar reporte")
+            dl = dl_info.value
+            txt_path = destino / (dl.suggested_filename or f"{origen}_{anio}_{mes:02d}.txt")
+            dl.save_as(str(txt_path))
+        except Exception as e:
+            print(f"[ERROR] No se pudo descargar el TXT: {e}")
+            return {"estado": "error", "mensaje": str(e), "n_xml": 0, "n_pdf": 0}
 
-        # 6) Parsear TXT
         claves = _extraer_claves_desde_txt(txt_path)
         if not claves:
-            browser.close()
-            return {"estado":"sin_descargas","mensaje":"TXT sin claves","n_xml":0,"n_pdf":0}
+            return {"estado": "sin_descargas", "mensaje": "TXT sin claves", "n_xml": 0, "n_pdf": 0}
 
-        # 7) Descargar por clave (XML y/o PDF)
         for i, item in enumerate(claves, start=1):
             clave_acc = item["clave"]
-            nombre_base = clave_acc  # puedes anteponer tipo/fecha si quieres
             try:
-                # Re-abrir página del módulo (asegura estado limpio)
-                page.goto(url_modulo, timeout=60000)
+                page.goto(BUSQUEDA_CLAVE_URL, timeout=60000)
                 page.wait_for_load_state("domcontentloaded")
                 _espera_captcha(page)
+                page.fill("input", clave_acc)
+                _click_descargar(page, "Consultar")
+                page.wait_for_load_state("networkidle")
+                time.sleep(0.5)
 
-                # Buscar por clave
-                _buscar_por_clave(page, clave_acc)
-
-                # Descargar XML
                 if "XML" in formatos:
-                    if _descargar_xml(page, destino_xml, nombre_base):
-                        n_xml += 1
+                    with page.expect_download() as dlinfo:
+                        _click_descargar(page, "XML") or _click_descargar(page, "Descargar XML")
+                    d = dlinfo.value
+                    d.save_as(str(destino_xml / f"{clave_acc}.xml"))
+                    n_xml += 1
 
-                # Descargar PDF (RIDE)
                 if "PDF" in formatos:
-                    if _descargar_pdf(page, destino_pdf, nombre_base):
-                        n_pdf += 1
+                    with page.expect_download() as dlinfo:
+                        _click_descargar(page, "RIDE") or _click_descargar(page, "PDF")
+                    d = dlinfo.value
+                    d.save_as(str(destino_pdf / f"{clave_acc}.pdf"))
+                    n_pdf += 1
 
-                # Anti-bloqueo leve
-                time.sleep(0.2)
                 if i % 20 == 0:
-                    time.sleep(2)
+                    time.sleep(3)
             except Exception as e:
                 print(f"[WARN] Falló descarga para {clave_acc}: {e}")
                 continue
 
         browser.close()
 
-    return {
+    resultado = {
         "estado": "ok" if (n_xml or n_pdf) else "sin_descargas",
         "n_xml": n_xml,
         "n_pdf": n_pdf,
-        "txt": str(txt_path),
-        "origen": origen
+        "txt": str(destino / f"{origen}_{anio}_{mes:02d}.txt"),
     }
+
+    # ✅ Guardar registro
+    registrar_descarga(ruc, origen, anio, mes, tipo, resultado)
+    return resultado
