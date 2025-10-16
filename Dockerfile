@@ -1,32 +1,35 @@
 # ============================================================
-# DOCKERFILE: Playwright + Streamlit + Chromium (Render Ready)
+# DOCKERFILE: SRI Robot Audit — Playwright + Streamlit (Stable 2025)
 # ============================================================
-FROM python:3.13-slim
+FROM python:3.11-slim
 
 # ==============================
-# 1️⃣ Instalar dependencias mínimas del sistema
+# 1️⃣ Instalar dependencias del sistema (Chromium + compilación)
 # ==============================
-RUN apt-get update && apt-get install -y wget gnupg ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y \
+    wget gnupg ca-certificates fonts-liberation \
+    build-essential gcc g++ make \
+    libxml2-dev libxslt1-dev zlib1g-dev \
+    libasound2 libatk1.0-0 libatk-bridge2.0-0 libatspi2.0-0 libcups2 \
+    libxcomposite1 libxdamage1 libxrandr2 libxkbcommon0 libxshmfence1 \
+    libgbm1 libnss3 libxss1 libdrm2 libxkbfile1 libgtk-3-0 xvfb \
+    && rm -rf /var/lib/apt/lists/*
 
 # ==============================
-# 2️⃣ Crear directorio de trabajo
+# 2️⃣ Crear el directorio de trabajo
 # ==============================
 WORKDIR /app
 COPY . /app
 
 # ==============================
-# 3️⃣ Instalar dependencias Python y Playwright
+# 3️⃣ Instalar dependencias de Python y Playwright
 # ==============================
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
-
-# Instalar dependencias del navegador y Chromium
-RUN python -m playwright install-deps && \
-    mkdir -p /root/.cache/ms-playwright && \
-    PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright python -m playwright install chromium
+RUN pip install --upgrade pip setuptools wheel
+RUN pip install --use-deprecated=legacy-resolver -r requirements.txt
+RUN python -m playwright install --with-deps chromium
 
 # ==============================
-# 4️⃣ Variables de entorno globales
+# 4️⃣ Variables de entorno
 # ==============================
 ENV PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
 ENV PYPPETEER_HOME=/root/.cache/ms-playwright
@@ -35,7 +38,7 @@ ENV STREAMLIT_SERVER_HEADLESS=true
 ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0
 
 # ==============================
-# 5️⃣ Exponer puerto y ejecutar la app
+# 5️⃣ Exponer puerto y lanzar Streamlit
 # ==============================
 EXPOSE 8501
 CMD ["streamlit", "run", "aplicacion.py", "--server.port=8501", "--server.address=0.0.0.0"]
