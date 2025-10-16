@@ -1,21 +1,45 @@
-streamlit==1.38.0
-watchdog==4.0.1
-playwright==1.46.0
-pyee==11.1.0
+# ============================================================
+# SRI ROBOT AUDIT — Dependencias estables (Render 2025)
+# ============================================================
+
+# ------------------------------
+# 🌐 INTERFAZ WEB
+# ------------------------------
+streamlit==1.38.0           # UI principal
+watchdog==4.0.1             # Auto recarga de archivos
+
+# ------------------------------
+# 🧠 AUTOMATIZACIÓN CON PLAYWRIGHT
+# ------------------------------
+playwright==1.45.1           # Control de navegador Chromium
+pyee==11.1.0                 # Manejador interno de eventos
+
+# ------------------------------
+# 📊 PROCESAMIENTO DE DATOS
+# ------------------------------
 pandas==2.2.2
 numpy==1.26.4
 openpyxl==3.1.4
 lxml==5.2.2
 python-dateutil==2.9.0.post0
 pytz==2024.1
-requests==2.32.0
+
+# ------------------------------
+# ⚙️ UTILIDADES GENERALES
+# ------------------------------
+requests==2.31.0
 python-dotenv==1.0.1
 pathlib==1.0.1
 tqdm==4.66.4
+
+# ------------------------------
+# 🧾 REGISTRO Y DEPURACIÓN
+# ------------------------------
 rich==13.8.1
 loguru==0.7.2
-charset-normalizer==3.3.2
-certifi==2024.6.2
-idna==3.8
+
+# ------------------------------
+# 🧩 EXTRAS OPCIONALES
+# ------------------------------
 beautifulsoup4==4.12.3
 html5lib==1.1
