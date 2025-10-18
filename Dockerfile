@@ -1,33 +1,52 @@
 # --------------------------------------------------------
-# 🧩 SRI ROBOT AUDIT - Dockerfile FINAL (Playwright OK)
-# Basado en imagen oficial de Microsoft Playwright
+# 🧩 SRI ROBOT AUDIT — DOCKERFILE FINAL (Render OK)
+# Autor: Jorge / Revisión técnica: ChatGPT Asistente
+# Fecha: 2025-10-18
 # --------------------------------------------------------
 
+# Imagen base oficial de Playwright con Python + Chromium listo
 FROM mcr.microsoft.com/playwright/python:v1.47.0-jammy
 
-# Evita prompts
+# Evitar prompts interactivos y asegurar logs visibles
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
 
-# Crea carpeta de trabajo
+# Crear carpeta de trabajo
 WORKDIR /app
 
-# Copia dependencias
+# Copiar dependencias
 COPY requirements.txt .
 
-# Instala librerías adicionales si las necesitas
+# --------------------------------------------------------
+# 🧠 Instalar dependencias de compilación y versiones estables de pip
+# --------------------------------------------------------
+RUN pip install --upgrade pip==24.2 setuptools wheel && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    gcc python3-dev libxml2-dev libxslt1-dev && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# --------------------------------------------------------
+# 📦 Instalar librerías del proyecto
+# --------------------------------------------------------
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copia todo el proyecto
+# --------------------------------------------------------
+# 📂 Copiar el resto del proyecto
+# --------------------------------------------------------
 COPY . .
 
 # Crear carpeta de descargas
 RUN mkdir -p /app/descargas
 
-# Variables de entorno para compatibilidad con Render
+# --------------------------------------------------------
+# ⚙️ Variables de entorno Playwright
+# --------------------------------------------------------
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-ENV PYTHONUNBUFFERED=1
-ENV STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
-# Exponer puerto y lanzar app
+# --------------------------------------------------------
+# 🚀 Comando de inicio (Render detecta el puerto 8501)
+# --------------------------------------------------------
 EXPOSE 8501
 CMD ["streamlit", "run", "aplicacion.py", "--server.port=8501", "--server.address=0.0.0.0"]
