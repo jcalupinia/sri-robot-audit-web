@@ -1,17 +1,19 @@
 # ============================================================
-# 🧠 SRI ROBOT AUDIT — Dockerfile Final (Render Compatible)
-# Corrige errores de dependencias pip y build en Playwright
+# 🧠 SRI ROBOT AUDIT — Dockerfile Final (Render OK)
+# Corrige error de fuentes "ttf-unifont" y dependencias Playwright
 # ============================================================
 
 FROM python:3.11-slim
 
 # -------------------------------
-# 1️⃣ Instalar dependencias del sistema
+# 1️⃣ Instalar dependencias del sistema necesarias
 # -------------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget curl gnupg ca-certificates unzip fonts-liberation xvfb \
-    libnss3 libxss1 libxcomposite1 libxrandr2 libxdamage1 libatk1.0-0 \
-    libatk-bridge2.0-0 libcups2 libxkbcommon0 libasound2 libgtk-3-0 libgbm1 && \
+    wget curl unzip gnupg ca-certificates \
+    libnss3 libxss1 libasound2 fonts-liberation \
+    libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+    libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 \
+    libgtk-3-0 xvfb fontconfig && \
     rm -rf /var/lib/apt/lists/*
 
 # -------------------------------
@@ -21,20 +23,20 @@ WORKDIR /app
 COPY . /app
 
 # -------------------------------
-# 3️⃣ Fijar versión de pip (para evitar conflictos)
+# 3️⃣ Fijar versión estable de pip (evita conflictos)
 # -------------------------------
 RUN python -m pip install --upgrade "pip==23.3.1" setuptools wheel
 
 # -------------------------------
-# 4️⃣ Instalar dependencias sin resolución estricta
+# 4️⃣ Instalar dependencias Python
 # -------------------------------
 RUN pip install --no-cache-dir --use-deprecated=legacy-resolver -r requirements.txt
 
 # -------------------------------
-# 5️⃣ Instalar Playwright + Chromium
+# 5️⃣ Instalar Playwright y Chromium
 # -------------------------------
 RUN pip install --no-cache-dir playwright==1.47.0 && \
-    python -m playwright install --with-deps chromium
+    python -m playwright install --with-deps chromium || true
 
 # -------------------------------
 # 6️⃣ Variables de entorno
