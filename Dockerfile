@@ -1,25 +1,25 @@
 # --------------------------------------------------------
-# 🧩 SRI ROBOT AUDIT — DOCKERFILE FINAL (Render OK)
+# 🧩 SRI ROBOT AUDIT — DOCKERFILE FINAL (Render.com OK)
 # Autor: Jorge / Revisión técnica: ChatGPT Asistente
 # Fecha: 2025-10-18
 # --------------------------------------------------------
 
-# Imagen base oficial de Playwright con Python + Chromium listo
+# Imagen base oficial de Playwright (trae Chromium y fuentes preinstaladas)
 FROM mcr.microsoft.com/playwright/python:v1.47.0-jammy
 
-# Evitar prompts interactivos y asegurar logs visibles
+# Evitar prompts y logs truncados
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
 
-# Crear carpeta de trabajo
+# Carpeta de trabajo
 WORKDIR /app
 
-# Copiar dependencias
+# Copiar dependencias del proyecto
 COPY requirements.txt .
 
 # --------------------------------------------------------
-# 🧠 Instalar dependencias de compilación y versiones estables de pip
+# 🧠 Instalar compiladores + fijar versión de pip estable
 # --------------------------------------------------------
 RUN pip install --upgrade pip==24.2 setuptools wheel && \
     apt-get update && apt-get install -y --no-install-recommends \
@@ -32,21 +32,21 @@ RUN pip install --upgrade pip==24.2 setuptools wheel && \
 RUN pip install --no-cache-dir -r requirements.txt
 
 # --------------------------------------------------------
-# 📂 Copiar el resto del proyecto
+# 📂 Copiar el resto del código
 # --------------------------------------------------------
 COPY . .
 
-# Crear carpeta de descargas
+# Crear carpeta de descargas (por si no existe)
 RUN mkdir -p /app/descargas
 
 # --------------------------------------------------------
-# ⚙️ Variables de entorno Playwright
+# ⚙️ Variables Playwright para Render
 # --------------------------------------------------------
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
 # --------------------------------------------------------
-# 🚀 Comando de inicio (Render detecta el puerto 8501)
+# 🚀 Comando de inicio de Streamlit
 # --------------------------------------------------------
 EXPOSE 8501
 CMD ["streamlit", "run", "aplicacion.py", "--server.port=8501", "--server.address=0.0.0.0"]
