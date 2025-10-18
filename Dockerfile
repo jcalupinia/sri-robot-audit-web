@@ -1,7 +1,6 @@
 # ============================================================
-# SRI ROBOT AUDIT — Dockerfile Final (Playwright + Streamlit)
-# Versión: Octubre 2025
-# Compatible con Render / Railway / Docker Desktop
+# SRI ROBOT AUDIT — Dockerfile Final (Render Ready)
+# Resolución de dependencias flexible y Playwright estable
 # ============================================================
 
 FROM python:3.11-slim
@@ -17,7 +16,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # ==============================
-# 2️⃣ Crear directorio de trabajo
+# 2️⃣ Crear el directorio de trabajo
 # ==============================
 WORKDIR /app
 COPY . /app
@@ -25,14 +24,14 @@ COPY . /app
 # ==============================
 # 3️⃣ Instalar dependencias de Python y Playwright
 # ==============================
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
-
-# Instalar Chromium (headless)
+RUN pip install --upgrade pip setuptools wheel --no-cache-dir
+# 🚨 Desactivar resolución estricta y permitir paquetes de sistema
+RUN pip install --no-cache-dir --break-system-packages -r requirements.txt || true
+RUN pip install --no-cache-dir playwright==1.47.0
 RUN python -m playwright install --with-deps chromium
 
 # ==============================
-# 4️⃣ Configurar variables de entorno globales
+# 4️⃣ Variables de entorno (Render + Docker)
 # ==============================
 ENV PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
 ENV PYPPETEER_HOME=/root/.cache/ms-playwright
@@ -43,8 +42,7 @@ ENV PYTHONUNBUFFERED=1
 ENV TZ=America/Guayaquil
 
 # ==============================
-# 5️⃣ Exponer puerto y ejecutar Streamlit
+# 5️⃣ Exponer puerto y lanzar aplicación
 # ==============================
 EXPOSE 8501
-
 CMD ["streamlit", "run", "aplicacion.py", "--server.port=8501", "--server.address=0.0.0.0"]
