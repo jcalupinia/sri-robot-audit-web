@@ -1,34 +1,23 @@
+# --------------------------------------------------------
+# ☁️ render.yaml — Configuración de despliegue SRI Robot Audit
+# --------------------------------------------------------
 services:
   - type: web
-    name: sri-robot-audit-web
-    env: python
+    name: sri-robot-audit
+    env: docker
     plan: free
-
-    buildCommand: |
-      echo "==== 🧱 INICIANDO BUILD SRI ROBOT AUDIT ===="
-      pip install --upgrade pip
-      pip install -r requirements.txt
-
-      # 1️⃣ Instalar dependencias del sistema para Playwright
-      python -m playwright install-deps
-
-      # 2️⃣ Instalar navegadores directamente en la ruta esperada
-      mkdir -p /root/.cache/ms-playwright
-      PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright python -m playwright install chromium
-
-      # 3️⃣ Verificar instalación exitosa
-      echo "==== ✅ NAVEGADORES DISPONIBLES ===="
-      find /root/.cache/ms-playwright -type f -name "headless_shell" || true
-
-    startCommand: |
-      # 4️⃣ Variables de entorno requeridas
-      export PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
-      export PYPPETEER_HOME=/root/.cache/ms-playwright
-      export STREAMLIT_SERVER_PORT=$PORT
-      export STREAMLIT_SERVER_HEADLESS=true
-      export STREAMLIT_SERVER_ADDRESS=0.0.0.0
-
-      echo "==== 🚀 INICIANDO APLICACIÓN SRI ROBOT AUDIT ===="
-      streamlit run aplicacion.py --server.port $PORT --server.address 0.0.0.0
-
+    branch: main
+    buildCommand: ""          # Render usa el Dockerfile automáticamente
+    startCommand: streamlit run aplicacion.py --server.port=8501 --server.address=0.0.0.0
+    envVars:
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: /ms-playwright
+      - key: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD
+        value: "1"
+      - key: STREAMLIT_BROWSER_GATHER_USAGE_STATS
+        value: "false"
+      - key: PYTHONUNBUFFERED
+        value: "1"
+    healthCheckPath: /
     autoDeploy: true
+    timeout: 600
