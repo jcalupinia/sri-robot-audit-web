@@ -1,16 +1,18 @@
+# aplicacion.py — SRI Robot Audit (versión corregida)
 import os
-import streamlit as st
-from pathlib import Path
-from datetime import datetime
 import shutil
+from datetime import datetime
+from pathlib import Path
+
 import pandas as pd
-import matplotlib.pyplot as plt
+import streamlit as st
+
+from historial import registrar_descarga, obtener_historial
 from robot.downloader import descargar_sri
 from robot.parser import construir_reporte
-from robot.historial import obtener_historial
 
 # ==============================
-# CONFIGURACIÓN GENERAL (Docker / Render)
+# CONFIGURACIÓN GENERAL
 # ==============================
 st.set_page_config(
     page_title="SRI Robot Audit",
@@ -19,13 +21,13 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Variables de entorno Playwright
-os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/root/.cache/ms-playwright"
-os.environ["PYPPETEER_HOME"] = "/root/.cache/ms-playwright"
+# Respetar variables del entorno (Docker/Render) y dar fallback local
+os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/ms-playwright")
+os.environ.setdefault("PYPPETEER_HOME", "/ms-playwright")
 
 BASE_DIR = Path(__file__).parent
 DESC_DIR = BASE_DIR / "descargas"
-DESC_DIR.mkdir(exist_ok=True)
+DESC_DIR.mkdir(exist_ok=True, parents=True)
 
 # ==============================
 # SIDEBAR CORPORATIVO
@@ -45,11 +47,11 @@ with st.sidebar:
 # ==============================
 st.title("🧾 SRI Robot Audit — Descarga y Reporte Automático")
 
-tab1, tab2 = st.tabs(["📥 Descarga de Comprobantes", "📊 Reportes y Resultados"])
+tab1, tab2 = st.tabs(["📥 Descarga de Comprobantes", "📊 Reportes e Historial"])
 
-# ============================================================
-# TAB 1 — DESCARGA DE COMPROBANTES
-# ============================================================
+# =====================================================
+# TAB 1 — DESCARGA Y PROCESAMIENTO AUTOMÁTICO
+# =====================================================
 with tab1:
     st.markdown("#### 1️⃣ Ingreso de Credenciales y Filtros")
 
@@ -78,116 +80,86 @@ with tab1:
 
     st.markdown("---")
 
-    # ==============================
-    # BOTÓN DE DESCARGA
-    # ==============================
-    if st.button("🚀 Iniciar descarga", use_container_width=True, type="primary"):
+    if st.button("🚀 Iniciar proceso", use_container_width=True, type="primary"):
         if not ruc or not clave:
             st.warning("⚠️ Ingresa RUC y clave antes de continuar.")
         else:
             destino = DESC_DIR / ruc / f"{anio:04d}" / f"{mes:02d}"
             destino.mkdir(parents=True, exist_ok=True)
 
-            with st.spinner(f"🔍 Conectando al SRI ({origen}) y descargando comprobantes..."):
-                resultado = descargar_sri(ruc, clave, anio, mes, tipo, formatos, destino, origen=origen)
-
-            if resultado["estado"] == "sin_descargas":
-                st.warning("⚠️ No se encontraron comprobantes para el período seleccionado.")
-            elif resultado["estado"] == "error":
-                st.error(f"❌ Error durante la descarga: {resultado.get('mensaje', 'desconocido')}")
-            else:
-                st.success(
-                    f"✅ Descarga completada ({origen}). "
-                    f"XML: {resultado['n_xml']} | PDF: {resultado['n_pdf']}"
+            with st.spinner(f"🔍 Conectando al SRI ({origen}) y procesando comprobantes..."):
+                resultado = descargar_sri(
+                    ruc, clave, anio, mes, tipo, formatos, destino, origen=origen
                 )
 
-                # TXT semilla
-                if "txt" in resultado and Path(resultado["txt"]).exists():
-                    with open(resultado["txt"], "rb") as f:
+            # Registrar en historial (resultado resumido para trazabilidad)
+            registrar_descarga(ruc, origen, anio, mes, tipo, resultado)
+
+            # Mostrar resultados dinámicos
+            estado = resultado.get("estado", "")
+            if estado == "sin_descargas":
+                st.warning("⚠️ No se encontraron comprobantes para el período seleccionado.")
+            elif origen == "Emitidos":
+                n_regs = resultado.get("n_registros", 0)
+                st.success(f"✅ Reporte de emitidos generado con {n_regs} registros.")
+                reporte_path = resultado.get("reporte")
+                if reporte_path and Path(reporte_path).exists():
+                    with open(reporte_path, "rb") as f:
+                        st.download_button(
+                            "📊 Descargar reporte Excel (Emitidos)",
+                            f,
+                            file_name=Path(reporte_path).name,
+                            use_container_width=True,
+                        )
+            else:
+                n_xml = resultado.get("n_xml", 0)
+                n_pdf = resultado.get("n_pdf", 0)
+                st.success(f"✅ Descarga completada. XML: {n_xml} | PDF: {n_pdf}")
+
+                txt_path = resultado.get("txt")
+                if txt_path and Path(txt_path).exists():
+                    with open(txt_path, "rb") as f:
                         st.download_button(
                             "⬇️ Descargar TXT semilla",
                             f,
-                            file_name=Path(resultado["txt"]).name,
+                            file_name=Path(txt_path).name,
                             use_container_width=True,
                         )
 
-                # Reporte Excel
-                if resultado["n_xml"] > 0:
+                if n_xml > 0:
                     xml_folder = destino / "XML"
                     excel_path = destino / f"reporte_{anio}_{mes:02d}.xlsx"
                     construir_reporte(xml_folder, excel_path)
-                    with open(excel_path, "rb") as f:
+                    if excel_path.exists():
+                        with open(excel_path, "rb") as f:
+                            st.download_button(
+                                "📈 Descargar reporte Excel (Recibidos)",
+                                f,
+                                file_name=excel_path.name,
+                                use_container_width=True,
+                            )
+
+                zip_path = destino.with_suffix(".zip")
+                shutil.make_archive(str(destino), "zip", destino)
+                if zip_path.exists():
+                    with open(zip_path, "rb") as f:
                         st.download_button(
-                            "📊 Descargar reporte Excel",
+                            "📦 Descargar ZIP completo",
                             f,
-                            file_name=excel_path.name,
+                            file_name=zip_path.name,
                             use_container_width=True,
                         )
 
-                # ZIP completo
-                zip_path = destino.with_suffix(".zip")
-                shutil.make_archive(str(destino), "zip", destino)
-                with open(zip_path, "rb") as f:
-                    st.download_button(
-                        "📦 Descargar ZIP de comprobantes",
-                        f,
-                        file_name=zip_path.name,
-                        use_container_width=True,
-                    )
-
-# ============================================================
-# TAB 2 — DASHBOARD DE REPORTES E HISTORIAL
-# ============================================================
+# =====================================================
+# TAB 2 — HISTORIAL Y REPORTE DE ACTIVIDAD
+# =====================================================
 with tab2:
-    st.markdown("### 📊 Reportes y Resultados — Historial de Descargas")
+    st.markdown("#### 📜 Historial de ejecuciones recientes")
+    historial = obtener_historial()
 
-    data = obtener_historial()
-    if not data:
-        st.info("Aún no hay descargas registradas. Ejecuta una descarga para comenzar.")
+    # Evitar "valor de verdad ambiguo" en DataFrame
+    if isinstance(historial, pd.DataFrame) and not historial.empty:
+        st.dataframe(historial, use_container_width=True)
+        st.success(f"📂 Total de operaciones registradas: {len(historial)}")
     else:
-        df = pd.DataFrame(data)
-        df["Periodo"] = df["anio"].astype(str) + "-" + df["mes"].astype(str).str.zfill(2)
-
-        # --- Métricas generales ---
-        col1, col2, col3 = st.columns(3)
-        col1.metric("📄 XML descargados", int(df["xml_descargados"].sum()))
-        col2.metric("📘 PDF descargados", int(df["pdf_descargados"].sum()))
-        col3.metric("✅ Éxito de procesos", f"{(df['estado'].eq('ok').mean() * 100):.1f}%")
-
-        # --- Tabla de historial ---
-        st.markdown("#### 📋 Historial completo")
-        st.dataframe(
-            df.sort_values("timestamp", ascending=False),
-            use_container_width=True,
-            hide_index=True
-        )
-
-        # --- Gráfico: descargas por mes y tipo ---
-        st.markdown("#### 📈 Volumen mensual de descargas")
-        resumen = (
-            df.groupby(["Periodo", "origen"])[["xml_descargados", "pdf_descargados"]]
-            .sum()
-            .reset_index()
-        )
-
-        fig, ax = plt.subplots(figsize=(10, 5))
-        for origen, subset in resumen.groupby("origen"):
-            ax.plot(subset["Periodo"], subset["xml_descargados"], marker="o", label=f"{origen} (XML)")
-            ax.plot(subset["Periodo"], subset["pdf_descargados"], marker="s", linestyle="--", label=f"{origen} (PDF)")
-
-        ax.set_title("Tendencia mensual de comprobantes descargados", fontsize=13)
-        ax.set_xlabel("Periodo (Año-Mes)")
-        ax.set_ylabel("Cantidad de archivos")
-        ax.legend()
-        ax.grid(True, linestyle="--", alpha=0.5)
-        plt.xticks(rotation=45)
-        st.pyplot(fig)
-
-        # --- Totales por tipo de comprobante ---
-        st.markdown("#### 🧾 Totales por tipo de comprobante")
-        totales_tipo = (
-            df.groupby(["tipo", "origen"])[["xml_descargados", "pdf_descargados"]]
-            .sum()
-            .reset_index()
-        )
-        st.dataframe(totales_tipo, use_container_width=True, hide_index=True)
+        st.info("Aún no hay registros de descargas o reportes.")
