@@ -1,99 +1,80 @@
+# =====================================================
+# 📜 MÓDULO: HISTORIAL DE DESCARGAS Y AUDITORÍA
+# =====================================================
+# Guarda y recupera el historial de ejecuciones del robot.
+# Estructura de archivo: historial_descargas.json
+# =====================================================
+
 import json
 from datetime import datetime
 from pathlib import Path
 import pandas as pd
 
-# ==============================
-# CONFIGURACIÓN
-# ==============================
-HISTORIAL_PATH = Path("historial_descargas.json")
+# Ruta base (Render / Docker / local)
+BASE_DIR = Path(__file__).resolve().parent.parent
+HIST_PATH = BASE_DIR / "historial_descargas.json"
 
-
-# ============================================================
-# FUNCIONES BÁSICAS DE LECTURA Y ESCRITURA
-# ============================================================
-def _leer_historial() -> list:
+# =====================================================
+# 🧾 REGISTRAR DESCARGA
+# =====================================================
+def registrar_descarga(ruc, origen, anio, mes, tipo, resultado):
     """
-    Carga el historial desde el archivo JSON si existe.
-    Retorna una lista de registros.
+    Registra una ejecución del robot en el archivo JSON.
+    Crea el historial si no existe.
     """
-    if HISTORIAL_PATH.exists():
-        try:
-            data = json.loads(HISTORIAL_PATH.read_text(encoding="utf-8"))
-            if isinstance(data, list):
-                return data
-        except Exception:
-            pass
-    return []
-
-
-def _guardar_historial(historial: list):
-    """
-    Guarda el historial completo en formato JSON.
-    """
-    try:
-        HISTORIAL_PATH.write_text(json.dumps(historial, indent=2, ensure_ascii=False))
-    except Exception as e:
-        print(f"[WARN] No se pudo guardar historial: {e}")
-
-
-# ============================================================
-# REGISTRO DE UNA NUEVA DESCARGA / REPORTE
-# ============================================================
-def registrar_descarga(ruc: str, origen: str, anio: int, mes: int, tipo: str, resultado: dict):
-    """
-    Registra una nueva ejecución (descarga o generación de reporte).
-    Evita duplicados (mismo RUC + periodo + tipo + origen).
-    """
-    historial = _leer_historial()
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
     registro = {
-        "Fecha": timestamp,
-        "RUC": ruc,
-        "Origen": origen,
-        "Año": anio,
-        "Mes": mes,
-        "Tipo": tipo,
-        "Estado": resultado.get("estado", "desconocido"),
-        "XML descargados": resultado.get("n_xml", 0),
-        "PDF descargados": resultado.get("n_pdf", 0),
-        "Registros (Emitidos)": resultado.get("n_registros", 0),
-        "Archivo TXT": resultado.get("txt", ""),
-        "Reporte Excel": resultado.get("reporte", ""),
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "ruc": ruc,
+        "origen": origen,
+        "anio": int(anio),
+        "mes": int(mes),
+        "tipo": tipo,
+        "estado": resultado.get("estado", "finalizado"),
+        "n_xml": resultado.get("n_xml", 0),
+        "n_pdf": resultado.get("n_pdf", 0),
+        "n_registros": resultado.get("n_registros", 0),
     }
 
-    # Eliminar duplicados (misma combinación)
-    historial = [
-        h for h in historial
-        if not (
-            h.get("RUC") == ruc
-            and h.get("Origen") == origen
-            and h.get("Año") == anio
-            and h.get("Mes") == mes
-            and h.get("Tipo") == tipo
-        )
-    ]
+    # Leer historial existente o iniciar lista vacía
+    if HIST_PATH.exists():
+        try:
+            with open(HIST_PATH, "r", encoding="utf-8") as f:
+                historial = json.load(f)
+                if not isinstance(historial, list):
+                    historial = []
+        except Exception:
+            historial = []
+    else:
+        historial = []
 
+    # Agregar nuevo registro y guardar
     historial.append(registro)
-    _guardar_historial(historial)
+    with open(HIST_PATH, "w", encoding="utf-8") as f:
+        json.dump(historial, f, ensure_ascii=False, indent=2)
+
+    return registro
 
 
-# ============================================================
-# OBTENER HISTORIAL EN FORMATO TABULAR (para Streamlit)
-# ============================================================
-def obtener_historial() -> pd.DataFrame:
+# =====================================================
+# 📊 OBTENER HISTORIAL
+# =====================================================
+def obtener_historial():
     """
-    Devuelve el historial en formato pandas.DataFrame
-    para visualización directa en Streamlit.
+    Devuelve el historial como DataFrame ordenado (más recientes primero).
+    Si no existe, devuelve un DataFrame vacío.
     """
-    data = _leer_historial()
-    if not data:
+    if not HIST_PATH.exists():
         return pd.DataFrame()
 
-    df = pd.DataFrame(data)
-    # Ordenar por fecha descendente
-    if "Fecha" in df.columns:
-        df = df.sort_values("Fecha", ascending=False)
-    return df
-
+    try:
+        with open(HIST_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, list):
+            return pd.DataFrame()
+        df = pd.DataFrame(data)
+        if not df.empty:
+            df = df.sort_values(by="timestamp", ascending=False).reset_index(drop=True)
+        return df
+    except Exception:
+        # Si el JSON está corrupto, devolver vacío
+        return pd.DataFrame()
