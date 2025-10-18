@@ -1,4 +1,8 @@
-# aplicacion.py — SRI Robot Audit (versión corregida)
+# =====================================================
+# 🤖 SRI ROBOT AUDIT — APLICACIÓN PRINCIPAL STREAMLIT
+# Versión estable para Render.com / Octubre 2025
+# =====================================================
+
 import os
 import shutil
 from datetime import datetime
@@ -7,9 +11,9 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from historial import registrar_descarga, obtener_historial
 from robot.downloader import descargar_sri
 from robot.parser import construir_reporte
+from robot.historial import registrar_descarga, obtener_historial   # ✅ FIX import correcto
 
 # ==============================
 # CONFIGURACIÓN GENERAL
@@ -21,7 +25,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Respetar variables del entorno (Docker/Render) y dar fallback local
+# Variables para Playwright (Render / Docker)
 os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/ms-playwright")
 os.environ.setdefault("PYPPETEER_HOME", "/ms-playwright")
 
@@ -92,7 +96,7 @@ with tab1:
                     ruc, clave, anio, mes, tipo, formatos, destino, origen=origen
                 )
 
-            # Registrar en historial (resultado resumido para trazabilidad)
+            # Registrar en historial
             registrar_descarga(ruc, origen, anio, mes, tipo, resultado)
 
             # Mostrar resultados dinámicos
@@ -157,7 +161,7 @@ with tab2:
     st.markdown("#### 📜 Historial de ejecuciones recientes")
     historial = obtener_historial()
 
-    # Evitar "valor de verdad ambiguo" en DataFrame
+    # ✅ Evitar error “valor de verdad de un DataFrame es ambiguo”
     if isinstance(historial, pd.DataFrame) and not historial.empty:
         st.dataframe(historial, use_container_width=True)
         st.success(f"📂 Total de operaciones registradas: {len(historial)}")
